@@ -7,8 +7,8 @@
 #define DEFAULT_GRID_SIZE 202
 #define DEFAULT_NUM_ITER 30000
 #define GRID_START_VALUE 0
-#define BOUNDARY_VALUE_NW 1000
-#define BOUNDARY_VALUE_SE -10
+#define BOUNDARY_VALUE_NW 1
+#define BOUNDARY_VALUE_SE 1
 
 double read_timer() {
     static bool initialized = false;
