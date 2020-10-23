@@ -4,8 +4,8 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define DEFAULT_GRID_SIZE 202
-#define DEFAULT_NUM_ITER 30000
+#define DEFAULT_GRID_SIZE 22
+#define DEFAULT_NUM_ITER 300
 #define GRID_START_VALUE 0
 #define BOUNDARY_VALUE_NW 1
 #define BOUNDARY_VALUE_SE 1
@@ -37,17 +37,26 @@ void initGrid(int gridSize, double grid[][gridSize]) {
     }
 }
 
-void printGrid(int gridSize, double grid[][gridSize]) {
+void printGrid(int gridSize, double grid[][gridSize], bool toFile) {
+    
+    FILE *file;
+    if(toFile){
+        file = fopen("./seqOutput.txt", "w");
+    }
     for(int i = 0; i < gridSize; i++) {
         for(int j = 0; j < gridSize; j++) {
-            printf("%.2f ", grid[i][j]);
+            (toFile) ? fprintf(file, "%f ", grid[i][j]) : printf("%.2f ", grid[i][j]);
+        }
+        (toFile) ? fprintf(file, "\n") : printf("\n");
+    }
+    if(!toFile) {
+        for(int i = 0; i < gridSize; i++) {
+            printf("----");
         }
         printf("\n");
+    } else {
+        fclose(file);
     }
-    for(int i = 0; i < gridSize; i++) {
-        printf("----");
-    }
-    printf("\n");
 }
 
 
@@ -98,7 +107,7 @@ int main(int argc, char *argv[]) {
     }
 
     endTime = read_timer();
-    //printGrid(gridSize, oldGrid);
+    printGrid(gridSize, oldGrid, true);
     printf("GridSize: %d, NumIter: %d, maxDiff: %f, Time: %g \n", gridSize, numIter, maxDiff, endTime - startTime);
 
     return 0;
