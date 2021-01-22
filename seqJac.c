@@ -25,8 +25,8 @@ int main(int argc, char *argv[]) {
     gridSize = (argc > 1) ? atoi(argv[1]) : DEFAULT_GRID_SIZE;
     numIter = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ITER;
 
-    double oldGrid[gridSize][gridSize];
-    double newGrid[gridSize][gridSize];
+    //double oldGrid[gridSize][gridSize];
+    //double newGrid[gridSize][gridSize];
 
     initGrid(gridSize, oldGrid);
     initGrid(gridSize, newGrid);
