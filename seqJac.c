@@ -16,6 +16,25 @@ void printGrid(int gridSize, double grid[][gridSize], bool toFile);
 void initGridValues(int gridSize, double grid[][gridSize]);
 double jacobiSolver(int gridSize, double grid[][gridSize], double newGrid[][gridSize], int loops);
 
+int main(int argc, char *argv[]) {
+
+    //Initiation
+    int gridSize, numIter;
+    double startTime, endTime, maxDiff;
+
+    gridSize = (argc > 1) ? atoi(argv[1]) : DEFAULT_GRID_SIZE;
+    numIter = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ITER;
+
+    double oldGrid[gridSize][gridSize];
+    double newGrid[gridSize][gridSize];
+
+    initGrid(gridSize, oldGrid);
+    initGrid(gridSize, newGrid);
+
+    // Iterate solution
+    startTime = read_timer();
+
+}
 
 double jacobiSolver(int gridSize, double grid[][gridSize], double newGrid[][gridSize], int numLoops) {
     
