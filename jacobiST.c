@@ -92,6 +92,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    endTime = read_timer();
+
     double cmpVal = 0;
     maxDiff = 0;
     for(int i = 1; i < gridSize - 1; i++) {
@@ -106,8 +108,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    endTime = read_timer();
-    printGrid(gridSize, oldGrid, true);
+    printGrid(gridSize, oldGrid, false);
     printf("GridSize: %d, NumIter: %d, maxDiff: %f, Time: %g \n", gridSize, numIter, maxDiff, endTime - startTime);
 
     return 0;
