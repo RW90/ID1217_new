@@ -1,16 +1,30 @@
-// GridSize: 200, NumIter: 100000, maxError: 0.000000, Time: 30.1517
-// GridSize: 100, NumIter: 500000, maxError: 0.000000, Time: 35.0207
+// 
+// 
+
+#ifndef _REENTRANT 
+#define _REENTRANT 
+#endif 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
 #include <sys/time.h>
+#include <pthread.h>
 
+#define DEFAULT_NUM_WORKERS 4
 #define DEFAULT_GRID_SIZE 22
 #define DEFAULT_NUM_ITER 300
 #define GRID_START_VALUE 0
 #define BOUNDARY_VALUE_NW 1
 #define BOUNDARY_VALUE_SE 1
+
+struct workerArgs {
+    int id;
+    int gridSize;
+    int numWorkers;
+    int numIters;
+};
 
 double read_timer() {
     static bool initialized = false;
@@ -61,24 +75,17 @@ void printGrid(int gridSize, double grid[][gridSize], bool toFile) {
     }
 }
 
+void *calcGrid(void *args) {
 
-int main(int argc, char *argv[]) {
+    //Till en början
+    int num = (int) args;
+    printf("Hi! I'm thread %d\n", num);
+    return;
 
-    //Initiation
-    int gridSize, numIter;
-    double startTime, endTime, maxError;
-
-    gridSize = (argc > 1) ? atoi(argv[1]) : DEFAULT_GRID_SIZE;
-    numIter = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ITER;
-
-    double oldGrid[gridSize][gridSize];
-    double newGrid[gridSize][gridSize];
-
-    initGrid(gridSize, oldGrid);
-    initGrid(gridSize, newGrid);
-
-    // Iterate solution
-    startTime = read_timer();
+    int iter = ((struct workerArgs *) args)->numIters;
+    int gridSize = ((struct workerArgs *) args)->gridSize;
+    int id = ((struct workerArgs *) args)->id;
+    int numWorkers = ((struct workerArgs *) args)->numWorkers;
 
     for(int iter = 0; iter < numIter; iter++){
         for(int i = 1; i < gridSize - 1; i++) {
@@ -87,11 +94,57 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //Barrier neccessary
+
         for(int i = 1; i < gridSize - 1; i++) {
             for(int j = 1; j < gridSize - 1; j++) {
                 oldGrid[i][j] = (newGrid[i - 1][j] + newGrid[i + 1][j] + newGrid[i][j - 1] + newGrid[i][j + 1])*0.25;
             }
         }
+
+        //Barrier neccessary
+    }
+
+
+}
+
+
+int main(int argc, char *argv[]) {
+
+    //Initiation
+    int gridSize, numIter, numWorkers;
+    double startTime, endTime, maxError;
+
+    gridSize = (argc > 1) ? atoi(argv[1]) : DEFAULT_GRID_SIZE;
+    numIter = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ITER;
+    numWorkers = (argc > 3) ? atoi(argv[3]) : DEFAULT_NUM_WORKERS;
+
+    double oldGrid[gridSize][gridSize];
+    double newGrid[gridSize][gridSize];
+
+    initGrid(gridSize, oldGrid);
+    initGrid(gridSize, newGrid);
+
+    //Init threads
+
+    pthread_attr_t attr;
+    pthread_t workers[numWorkers];
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+
+    // Iterate solution
+    startTime = read_timer();
+
+    for (int i = 0; i < numWorkers; i++){
+
+        // create returns 0 on success.
+        if(pthread_create(&workers[i], &attr, calcGrid, (void *) i)){
+            printf("Thread unable to be created. Exiting program.");
+            exit(0);
+        }
+    }
+    for(int i = 0; i < numWorkers; i++){
+        pthread_join(workers[i], NULL);
     }
 
     endTime = read_timer();
@@ -122,7 +175,7 @@ int main(int argc, char *argv[]) {
     */
 
     printGrid(gridSize, oldGrid, false);
-    printf("GridSize: %d, NumIter: %d, maxError: %f, Time: %g \n", gridSize, numIter, maxError, endTime - startTime);
+    printf("GridSize: %d, NumIter: %d, maxError: %f, numWorkers: %d, Time: %g \n", gridSize, numIter, maxError, numWorkers, endTime - startTime);
 
     return 0;
 }
