@@ -1,3 +1,4 @@
+// gcc -o st jacobiST.c -lpthread
 // GridSize: 200, NumIter: 100000, maxError: 0.000000, Time: 30.1517
 // GridSize: 100, NumIter: 500000, maxError: 0.000000, Time: 35.0207
 #include <stdlib.h>

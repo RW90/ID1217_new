@@ -1,5 +1,6 @@
+// gcc -o mt jacobiMT.c -lpthread -lm
 // 
-// 
+//
 
 #ifndef _REENTRANT 
 #define _REENTRANT 
@@ -11,6 +12,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <math.h>
+#include <sched.h>
 
 #define DEFAULT_NUM_WORKERS 4
 #define DEFAULT_GRID_SIZE 22
@@ -26,6 +29,7 @@ struct workerArgs {
     int numIter;
     double *oldGrid;
     double *newGrid;
+    int *barrierFlags;
 };
 
 double read_timer() {
@@ -77,6 +81,20 @@ void printGrid(int gridSize, double grid[][gridSize], bool toFile) {
     }
 }
 
+void disBarrier(int numWorkers, int id, int *flags) {
+
+    int numRounds = (int) ceil(log(numWorkers) / log(2)); // log(n) / log(2) is log2
+    int partner;
+
+    for(int i = 0; i < numRounds; i++) {
+        flags[id]++;
+        partner = ((int)(id + pow(2, i))) % numWorkers;
+        while(flags[partner] < flags[id]) {
+            sched_yield();
+        }
+    }
+}
+
 void *calcGrid(void *args) {
 
     //Till en början
@@ -88,9 +106,7 @@ void *calcGrid(void *args) {
     int numWorkers = ((struct workerArgs *) args)->numWorkers;
     double *oldGrid = ((struct workerArgs *) args)->oldGrid;
     double *newGrid = ((struct workerArgs *) args)->newGrid;
-
-    printf("Hi! I'm thread %d, with numIter %d, gridSize %d, numWorkers %d\n", id, iter, gridSize, numWorkers);
-
+    int *barrierFlags = ((struct workerArgs *) args)->barrierFlags;
 
     return;
     /*
@@ -118,6 +134,8 @@ void *calcGrid(void *args) {
 }
 
 
+
+
 int main(int argc, char *argv[]) {
 
     //Initiation
@@ -130,6 +148,7 @@ int main(int argc, char *argv[]) {
 
     double *oldGrid = malloc(gridSize * gridSize * sizeof(double));
     double *newGrid = malloc(gridSize * gridSize * sizeof(double));
+    int *barrierFlags = calloc(numWorkers, sizeof(int));
 
     initGrid(gridSize, oldGrid);
     initGrid(gridSize, newGrid);
@@ -149,6 +168,7 @@ int main(int argc, char *argv[]) {
         args[i].numWorkers = numWorkers;
         args[i].oldGrid = oldGrid;
         args[i].newGrid = newGrid;
+        args[i].barrierFlags = barrierFlags;
     }
 
     // Iterate solution
