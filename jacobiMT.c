@@ -1,6 +1,6 @@
 // gcc -o mt jacobiMT.c -lpthread -lm
-// 
-//
+// GridSize: 200, NumIter: 100000, maxError: 0.000000, numWorkers: 4, Time: 13.184
+// GridSize: 100, NumIter: 500000, maxError: 0.000000, numWorkers: 4, Time: 16.7525
 
 #ifndef _REENTRANT 
 #define _REENTRANT 
@@ -97,10 +97,8 @@ void disBarrier(int numWorkers, int id, int *flags) {
 
 void *calcGrid(void *args) {
 
-    //Till en början
-    
-
-    int iter = ((struct workerArgs *) args)->numIter;
+    int row;
+    int numIter = ((struct workerArgs *) args)->numIter;
     int gridSize = ((struct workerArgs *) args)->gridSize;
     int id = ((struct workerArgs *) args)->id;
     int numWorkers = ((struct workerArgs *) args)->numWorkers;
@@ -108,29 +106,25 @@ void *calcGrid(void *args) {
     double *newGrid = ((struct workerArgs *) args)->newGrid;
     int *barrierFlags = ((struct workerArgs *) args)->barrierFlags;
 
-    return;
-    /*
-
     for(int iter = 0; iter < numIter; iter++){
-        for(int i = 1; i < gridSize - 1; i++) {
+        for(int i = 1 + id; i < gridSize - 1; i += numWorkers) {
+            row = i * gridSize;
             for(int j = 1; j < gridSize - 1; j++) {
-                newGrid[i][j] = (oldGrid[i - 1][j] + oldGrid[i + 1][j] + oldGrid[i][j - 1] + oldGrid[i][j + 1])*0.25;
+                newGrid[row + j] = (oldGrid[row - gridSize + j] + oldGrid[row + gridSize + j] + oldGrid[row + j - 1] + oldGrid[row + j + 1])*0.25;
             }
         }
 
-        //Barrier neccessary
+        disBarrier(numWorkers, id, barrierFlags);
 
-        for(int i = 1; i < gridSize - 1; i++) {
+        for(int i = 1 + id; i < gridSize - 1; i += numWorkers) {
+            row = i * gridSize;
             for(int j = 1; j < gridSize - 1; j++) {
-                oldGrid[i][j] = (newGrid[i - 1][j] + newGrid[i + 1][j] + newGrid[i][j - 1] + newGrid[i][j + 1])*0.25;
+                oldGrid[row + j] = (newGrid[row - gridSize + j] + newGrid[row + gridSize + j] + newGrid[row + j - 1] + newGrid[row + j + 1])*0.25;
             }
         }
 
-        //Barrier neccessary
+        disBarrier(numWorkers, id, barrierFlags);
     }
-
-    */
-
 }
 
 
