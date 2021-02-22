@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
     }
     */
 
-    printGrid(gridSizes[0], oldGrids[0], false);
+    printGrid(gridSizes[0], oldGrids[0], true);
     printf("GridSize: %d, NumIter: %d, maxError: %f, Time: %g \n", gridSizes[3], numIter, maxError, endTime - startTime);
 
     return 0;

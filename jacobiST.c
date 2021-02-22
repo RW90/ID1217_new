@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     }
     */
 
-    printGrid(gridSize, oldGrid, false);
+    printGrid(gridSize, oldGrid, true);
     printf("GridSize: %d, NumIter: %d, maxError: %f, Time: %g \n", gridSize, numIter, maxError, endTime - startTime);
 
     return 0;
