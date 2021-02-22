@@ -6,12 +6,26 @@
 #include <stdbool.h>
 #include <time.h>
 #include <sys/time.h>
+#include <pthread.h>
+#include <math.h>
+#include <sched.h>
 
+#define DEFAULT_NUM_WORKERS 4
 #define DEFAULT_GRID_SIZE 14
 #define DEFAULT_NUM_ITER 300
 #define GRID_START_VALUE 0
 #define BOUNDARY_VALUE_NW 1
 #define BOUNDARY_VALUE_SE 1
+
+struct workerArgs {
+    int id;
+    int *gridSizes;
+    int numWorkers;
+    int numIter;
+    double **oldGrids;
+    double **newGrids;
+    int *barrierFlags;
+};
 
 double read_timer() {
     static bool initialized = false;
@@ -62,28 +76,51 @@ void printGrid(int gridSize, double grid[][gridSize], bool toFile) {
     }
 }
 
-void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid) {
+void disBarrier(int numWorkers, int id, int *flags) {
 
+    int numRounds = (int) ceil(log(numWorkers) / log(2)); // log(n) / log(2) is log2
+    int partner;
+
+    for(int i = 0; i < numRounds; i++) {
+        flags[id]++;
+        partner = ((int)(id + pow(2, i))) % numWorkers;
+        while(flags[partner] < flags[id]) {
+            //sched_yield();
+        }
+    }
+}
+
+void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid, int id, int numWorkers, int *barrierFlags) {
+
+    //printf("Tråd %d hoppar in i forloop\n", id);
     int row;
 
     for(int iter = 0; iter < numIter; iter++){
-        for(int i = 1; i < gridSize - 1; i++) {
+        for(int i = 1 + id; i < gridSize - 1; i += numWorkers) {
             row = i * gridSize;
             for(int j = 1; j < gridSize - 1; j++) {
                 newGrid[row + j] = (oldGrid[row - gridSize + j] + oldGrid[row + gridSize + j] + oldGrid[row + j - 1] + oldGrid[row + j + 1])*0.25;
             }
         }
 
-        for(int i = 1; i < gridSize - 1; i++) {
+        //printf("Tråd %d hoppar in i första barriären\n", id);
+        disBarrier(numWorkers, id, barrierFlags);
+
+        for(int i = 1 + id; i < gridSize - 1; i += numWorkers) {
             row = i * gridSize;
             for(int j = 1; j < gridSize - 1; j++) {
                 oldGrid[row + j] = (newGrid[row - gridSize + j] + newGrid[row + gridSize + j] + newGrid[row + j - 1] + newGrid[row + j + 1])*0.25;
             }
         }
+
+        //printf("Hoppar in i andra barriären\n");
+        disBarrier(numWorkers, id, barrierFlags);
+
+        //printf("Loop %d klar\n", iter);
     }
 }
 
-void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid) {
+void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id) {
 
     int coarseRow, fineRow, fineCol;
 
@@ -105,7 +142,7 @@ void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, doub
     */
 }
 
-void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid) {
+void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id) {
 
     int coarseRow, fineRow, fineCol;
 
@@ -144,16 +181,51 @@ void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double
     */
 }
 
+//WORKER FUNCTION
+
+void *workerFunc(void *args) {
+
+    int numIter = ((struct workerArgs *) args)->numIter;
+    int *gridSizes = ((struct workerArgs *) args)->gridSizes;
+    int id = ((struct workerArgs *) args)->id;
+    int numWorkers = ((struct workerArgs *) args)->numWorkers;
+    double **oldGrids = ((struct workerArgs *) args)->oldGrids;
+    double **newGrids = ((struct workerArgs *) args)->newGrids;
+    int *barrierFlags = ((struct workerArgs *) args)->barrierFlags;
+
+    printf("Hoppar in i calcgrid\n");
+    calcGrid(numIter, gridSizes[0], oldGrids[0], newGrids[0], id, numWorkers, barrierFlags);
+
+
+    /*
+    for(int i = 0; i < 3; i++) {
+        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
+        collapseGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
+    }
+
+    calcGrid(numIter, gridSizes[3], oldGrids[3], newGrids[3]);
+
+    for(int i = 2; i > -1; i--) {
+        expandGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
+        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
+    }
+    */
+
+}
+
+//MAIN FUNCTION
 
 int main(int argc, char *argv[]) {
 
     //Initiation
-    int numIter;
+    int numIter, numWorkers;
     double startTime, endTime, maxError;
     int *gridSizes = malloc(4 * sizeof(int *));
+    int *barrierFlags = calloc(numWorkers, sizeof(int));
 
     gridSizes[3] = (argc > 1) ? atoi(argv[1]) : DEFAULT_GRID_SIZE;
     numIter = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ITER;
+    numWorkers = (argc > 3) ? atoi(argv[3]) : DEFAULT_NUM_WORKERS;
 
     for(int i = 2; i > -1; i--) {
         gridSizes[i] = 2 * gridSizes[i + 1] - 1;
@@ -168,21 +240,38 @@ int main(int argc, char *argv[]) {
         initGrid(gridSizes[i], oldGrids[i]);
         initGrid(gridSizes[i], newGrids[i]);
     }
+
+    //Thread init
+    pthread_attr_t attr;
+    pthread_t workers[numWorkers];
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+
+    struct workerArgs *args = malloc(numWorkers * sizeof(struct workerArgs));
+    for(int i = 0; i < numWorkers; i++) {
+        args[i].id = i;
+        args[i].gridSizes = gridSizes;
+        args[i].numIter = numIter;
+        args[i].numWorkers = numWorkers;
+        args[i].oldGrids = oldGrids;
+        args[i].newGrids = newGrids;
+        args[i].barrierFlags = barrierFlags;
+    }
     
 
     // Iterate solution
     startTime = read_timer();
 
-    for(int i = 0; i < 3; i++) {
-        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
-        collapseGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
+    for (int i = 0; i < numWorkers; i++){
+
+        // create returns 0 on success.
+        if(pthread_create(&workers[i], &attr, workerFunc, (void *) &args[i])){
+            printf("Thread unable to be created. Exiting program.");
+            exit(0);
+        }
     }
-
-    calcGrid(numIter, gridSizes[3], oldGrids[3], newGrids[3]);
-
-    for(int i = 2; i > -1; i--) {
-        expandGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
-        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
+    for(int i = 0; i < numWorkers; i++){
+        pthread_join(workers[i], NULL);
     }
 
     endTime = read_timer();
@@ -215,7 +304,7 @@ int main(int argc, char *argv[]) {
     */
 
     printGrid(gridSizes[0], oldGrids[0], false);
-    printf("GridSize: %d, NumIter: %d, maxError: %f, Time: %g \n", gridSizes[3], numIter, maxError, endTime - startTime);
+    printf("GridSize: %d, NumIter: %d, maxError: %f, numWorkers: %d, Time: %g \n", gridSizes[3], numIter, maxError, numWorkers, endTime - startTime);
 
     return 0;
 }
