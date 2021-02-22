@@ -90,7 +90,7 @@ void disBarrier(int numWorkers, int id, int *flags) {
         flags[id]++;
         partner = ((int)(id + pow(2, i))) % numWorkers;
         while(flags[partner] < flags[id]) {
-            sched_yield();
+            //sched_yield();
         }
     }
 }
