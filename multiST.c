@@ -1,6 +1,7 @@
 // gcc -o st jacobiST.c -lpthread
 // GridSize: 14, NumIter: 30000000, maxError: 0.000000, Time: 31.9954
 // GridSize: 26, NumIter: 7500000, maxError: 0.000000, Time: 31.2199
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -97,12 +98,6 @@ void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, doub
             fineCol += 2;
         }
     }
-   
-   /*
-    printGrid(fineGridSize, fineGrid, false);
-    printf("--------------------------------\n");
-    printGrid(coarseGridSize, coarseGrid, false);
-    */
 }
 
 void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid) {
@@ -135,13 +130,6 @@ void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double
             fineGrid[fineRow + j] = (fineGrid[fineRow + j - 1] + fineGrid[fineRow + j + 1]) * 0.5;
         }
     }
-
-    /*
-    printf("--------------------------------\n");
-    printGrid(coarseGridSize, coarseGrid, false);
-    printGrid(fineGridSize, fineGrid, false);
-    printf("--------------------------------\n");
-    */
 }
 
 

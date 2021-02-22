@@ -1,6 +1,11 @@
 // gcc -o st jacobiST.c -lpthread
-// GridSize: 14, NumIter: 30000000, maxError: 0.000000, Time: 31.9954
-// GridSize: 26, NumIter: 7500000, maxError: 0.000000, Time: 31.2199
+// GridSize: 14, NumIter: 30000000, maxError: 0.000000, numWorkers: 4, Time: 44.9625
+// GridSize: 26, NumIter: 7500000, maxError: 0.000000, numWorkers: 4, Time: 22.9881
+
+#ifndef _REENTRANT 
+#define _REENTRANT 
+#endif 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -92,7 +97,6 @@ void disBarrier(int numWorkers, int id, int *flags) {
 
 void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid, int id, int numWorkers, int *barrierFlags) {
 
-    //printf("Tråd %d hoppar in i forloop\n", id);
     int row;
 
     for(int iter = 0; iter < numIter; iter++){
@@ -103,7 +107,6 @@ void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid, int i
             }
         }
 
-        //printf("Tråd %d hoppar in i första barriären\n", id);
         disBarrier(numWorkers, id, barrierFlags);
 
         for(int i = 1 + id; i < gridSize - 1; i += numWorkers) {
@@ -113,10 +116,7 @@ void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid, int i
             }
         }
 
-        //printf("Hoppar in i andra barriären\n");
         disBarrier(numWorkers, id, barrierFlags);
-
-        //printf("Loop %d klar\n", iter);
     }
 }
 
@@ -135,13 +135,7 @@ void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, doub
         }
     }
     
-    disBarrier(numWorkers, id, barrierFlags);
-
-   /*
-    printGrid(fineGridSize, fineGrid, false);
-    printf("--------------------------------\n");
-    printGrid(coarseGridSize, coarseGrid, false);
-    */
+    disBarrier(numWorkers, id, barrierFlags);  
 }
 
 void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id, int numWorkers, int *barrierFlags) {
@@ -162,7 +156,7 @@ void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double
     disBarrier(numWorkers, id, barrierFlags);
 
     //Calculate values for the columns for points inbetween mapped points
-    for(int i = 1 + id; i < fineGridSize - 1; i += 2 * numWorkers) {
+    for(int i = 1 + id * 2; i < fineGridSize - 1; i += 2 * numWorkers) {
         fineRow = i * fineGridSize;
         for(int j = 2; j < fineGridSize - 1; j += 2) {
             fineGrid[fineRow + j] = (fineGrid[fineRow - fineGridSize + j] + fineGrid[fineRow + fineGridSize + j]) * 0.5;
@@ -179,14 +173,7 @@ void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double
         }
     }
 
-    disBarrier(numWorkers, id, barrierFlags);
-
-    /*
-    printf("--------------------------------\n");
-    printGrid(coarseGridSize, coarseGrid, false);
-    printGrid(fineGridSize, fineGrid, false);
-    printf("--------------------------------\n");
-    */
+    disBarrier(numWorkers, id, barrierFlags);   
 }
 
 //WORKER FUNCTION
@@ -200,7 +187,7 @@ void *workerFunc(void *args) {
     double **oldGrids = ((struct workerArgs *) args)->oldGrids;
     double **newGrids = ((struct workerArgs *) args)->newGrids;
     int *barrierFlags = ((struct workerArgs *) args)->barrierFlags;
-
+   
     for(int i = 0; i < 3; i++) {
         calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i], id, numWorkers, barrierFlags);
         collapseGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i], id, numWorkers, barrierFlags);
@@ -212,6 +199,7 @@ void *workerFunc(void *args) {
         expandGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i], id, numWorkers, barrierFlags);
         calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i], id, numWorkers, barrierFlags);
     }
+    
 }
 
 //MAIN FUNCTION
@@ -304,7 +292,7 @@ int main(int argc, char *argv[]) {
     }
     */
 
-    printGrid(gridSizes[0], oldGrids[0], false);
+    printGrid(gridSizes[0], oldGrids[0], true);
     printf("GridSize: %d, NumIter: %d, maxError: %f, numWorkers: %d, Time: %g \n", gridSizes[3], numIter, maxError, numWorkers, endTime - startTime);
 
     return 0;
