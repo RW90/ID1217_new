@@ -120,11 +120,11 @@ void calcGrid(int numIter, int gridSize, double *oldGrid, double *newGrid, int i
     }
 }
 
-void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id) {
+void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id, int numWorkers, int *barrierFlags) {
 
     int coarseRow, fineRow, fineCol;
 
-    for(int i = 1; i < coarseGridSize - 1; i++) {
+    for(int i = 1 + id; i < coarseGridSize - 1; i += numWorkers) {
         coarseRow = i * coarseGridSize;
         fineRow = (2 * i) * fineGridSize;
         fineCol = 2;
@@ -134,7 +134,9 @@ void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, doub
             fineCol += 2;
         }
     }
-   
+    
+    disBarrier(numWorkers, id, barrierFlags);
+
    /*
     printGrid(fineGridSize, fineGrid, false);
     printf("--------------------------------\n");
@@ -142,12 +144,12 @@ void collapseGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, doub
     */
 }
 
-void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id) {
+void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double *fineGrid, int id, int numWorkers, int *barrierFlags) {
 
     int coarseRow, fineRow, fineCol;
 
     //Map values from coarse grid to fine grid
-    for(int i = 1; i < coarseGridSize - 1; i++) {
+    for(int i = 1 + id; i < coarseGridSize - 1; i += numWorkers) {
         coarseRow = i * coarseGridSize;
         fineRow = (2 * i) * fineGridSize;
         fineCol = 2;
@@ -157,21 +159,27 @@ void expandGrid(int coarseGridSize, int fineGridSize, double *coarseGrid, double
         }
     }
 
+    disBarrier(numWorkers, id, barrierFlags);
+
     //Calculate values for the columns for points inbetween mapped points
-    for(int i = 1; i < fineGridSize - 1; i += 2) {
+    for(int i = 1 + id; i < fineGridSize - 1; i += 2 * numWorkers) {
         fineRow = i * fineGridSize;
         for(int j = 2; j < fineGridSize - 1; j += 2) {
             fineGrid[fineRow + j] = (fineGrid[fineRow - fineGridSize + j] + fineGrid[fineRow + fineGridSize + j]) * 0.5;
         }
     }
 
+    disBarrier(numWorkers, id, barrierFlags);
+
     // Calculate values for the rest of the columns
-    for(int i = 1; i < fineGridSize - 1; i++) {
+    for(int i = 1 + id; i < fineGridSize - 1; i += numWorkers) {
         fineRow = i * fineGridSize;
         for(int j = 1; j < fineGridSize - 1; j += 2) {
             fineGrid[fineRow + j] = (fineGrid[fineRow + j - 1] + fineGrid[fineRow + j + 1]) * 0.5;
         }
     }
+
+    disBarrier(numWorkers, id, barrierFlags);
 
     /*
     printf("--------------------------------\n");
@@ -193,24 +201,17 @@ void *workerFunc(void *args) {
     double **newGrids = ((struct workerArgs *) args)->newGrids;
     int *barrierFlags = ((struct workerArgs *) args)->barrierFlags;
 
-    printf("Hoppar in i calcgrid\n");
-    calcGrid(numIter, gridSizes[0], oldGrids[0], newGrids[0], id, numWorkers, barrierFlags);
-
-
-    /*
     for(int i = 0; i < 3; i++) {
-        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
-        collapseGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
+        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i], id, numWorkers, barrierFlags);
+        collapseGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i], id, numWorkers, barrierFlags);
     }
 
-    calcGrid(numIter, gridSizes[3], oldGrids[3], newGrids[3]);
+    calcGrid(numIter, gridSizes[3], oldGrids[3], newGrids[3], id, numWorkers, barrierFlags);
 
     for(int i = 2; i > -1; i--) {
-        expandGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i]);
-        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i]);
+        expandGrid(gridSizes[i + 1], gridSizes[i], oldGrids[i + 1], oldGrids[i], id, numWorkers, barrierFlags);
+        calcGrid(4, gridSizes[i], oldGrids[i], newGrids[i], id, numWorkers, barrierFlags);
     }
-    */
-
 }
 
 //MAIN FUNCTION
